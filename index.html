@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImgToPDF</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0d;
+      --surf:    #141414;
+      --surf2:   #1c1c1c;
+      --border:  #272727;
+      --accent:  #7c6af7;
+      --accentH: #9d8fff;
+      --text:    #d4d4d4;
+      --dim:     #5a5a5a;
+      --red:     #d95f5f;
+    }
+
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 1rem 3rem;
+    }
+
+    .wrap { max-width: 860px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header { padding: 2.8rem 0 2rem; text-align: center; }
+    header h1 {
+      font-size: 2.1rem;
+      font-weight: 700;
+      letter-spacing: .2em;
+      color: var(--accent);
+    }
+    header p {
+      font-size: .78rem;
+      color: var(--dim);
+      margin-top: .45rem;
+      letter-spacing: .07em;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 2.5rem;
+      background: var(--surf);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.1rem 1.4rem;
+      margin-bottom: 1rem;
+      align-items: flex-end;
+    }
+
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+    .field label {
+      font-size: .66rem;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--dim);
+    }
+
+    select {
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: .4rem .6rem;
+      padding-right: 1.7rem;
+      border-radius: 5px;
+      font-family: inherit;
+      font-size: .82rem;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a5a5a'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right .55rem center;
+    }
+    select:focus { outline: 1px solid var(--accent); }
+
+    .range-row { display: flex; align-items: center; gap: .65rem; }
+    input[type=range] { width: 140px; accent-color: var(--accent); cursor: pointer; }
+    .rval { font-size: .82rem; color: var(--accent); min-width: 3.2ch; }
+
+    /* ── Drop zone ── */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      background: var(--surf);
+      padding: 2.8rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      margin-bottom: 1rem;
+    }
+    .dropzone:hover, .dropzone.over {
+      border-color: var(--accent);
+      background: #11112a;
+    }
+    .dropzone .dz-icon { margin: 0 auto .85rem; opacity: .5; display: block; }
+    .dropzone strong { font-size: .95rem; color: var(--text); letter-spacing: .04em; }
+    .dropzone p { font-size: .74rem; color: var(--dim); margin-top: .4rem; }
+    #file-input { display: none; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: .65rem;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .tleft { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .badge { font-size: .74rem; color: var(--dim); }
+    .badge b { color: var(--accent); }
+    .hint { font-size: .68rem; color: var(--dim); opacity: .75; }
+
+    /* ── Buttons ── */
+    .btn {
+      font-family: inherit;
+      font-size: .8rem;
+      letter-spacing: .05em;
+      padding: .5rem 1.1rem;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      transition: background .15s, opacity .15s;
+      text-decoration: none;
+    }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover:not(:disabled) { background: var(--accentH); }
+    .btn-accent:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #444; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: .65rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .card {
+      position: relative;
+      background: var(--surf);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      cursor: grab;
+      user-select: none;
+      transition: border-color .15s, box-shadow .15s, opacity .15s, transform .15s;
+    }
+    .card:active { cursor: grabbing; }
+    .card img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+    .card.dragging { opacity: .3; transform: scale(.91); }
+    .card.over-t { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+    .c-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(0,0,0,.62) 0%,
+        transparent 38%,
+        transparent 60%,
+        rgba(0,0,0,.7) 100%
+      );
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      padding: .32rem .38rem;
+    }
+
+    .c-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .c-num {
+      font-size: .62rem;
+      background: rgba(0,0,0,.55);
+      color: #999;
+      border-radius: 3px;
+      padding: .08rem .3rem;
+      line-height: 1.5;
+    }
+    .c-del {
+      background: rgba(0,0,0,.5);
+      border: none; color: var(--red);
+      border-radius: 3px;
+      width: 20px; height: 20px;
+      cursor: pointer; font-size: 1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .c-del:hover { background: rgba(217,95,95,.35); }
+
+    .c-name {
+      font-size: .57rem;
+      color: #c0c0c0;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap { display: none; margin-bottom: 1.1rem; }
+    .progress-hd {
+      display: flex; justify-content: space-between;
+      font-size: .7rem; color: var(--dim); margin-bottom: .35rem;
+    }
+    .progress-track {
+      height: 6px; border-radius: 3px;
+      background: var(--surf2); border: 1px solid var(--border); overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 3px;
+      background: var(--accent); width: 0%; transition: width .25s;
+    }
+
+    /* ── Actions ── */
+    .actions { display: flex; gap: .7rem; flex-wrap: wrap; margin-bottom: 2rem; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.2rem;
+      text-align: center;
+      font-size: .7rem;
+      color: var(--dim);
+      letter-spacing: .05em;
+    }
+    footer a { color: var(--dim); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.6rem; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); }
+      .controls { flex-direction: column; }
+      input[type=range] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>ImgToPDF</h1>
+    <p>convert images to pdf &mdash; everything runs in your browser</p>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="page-size">Page size</label>
+      <select id="page-size">
+        <option value="a4">A4 &nbsp;(210 &times; 297 mm)</option>
+        <option value="letter">Letter &nbsp;(216 &times; 279 mm)</option>
+        <option value="fit">Fit to image</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Compression quality</label>
+      <div class="range-row">
+        <input type="range" id="quality" min="40" max="95" value="75" step="5">
+        <span class="rval" id="q-val">75%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <svg class="dz-icon" width="44" height="44" viewBox="0 0 24 24"
+         fill="none" stroke="#7c6af7" stroke-width="1.35"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+      <polyline points="8.5 12 12 8.5 15.5 12"/>
+      <line x1="12" y1="8.5" x2="12" y2="16"/>
+    </svg>
+    <strong>Tap to add images</strong>
+    <p>or drag &amp; drop files here</p>
+    <p style="margin-top:.3rem">JPG &middot; PNG &middot; WEBP &nbsp;|&nbsp; up to 40 images</p>
+    <input type="file" id="file-input" accept="image/*" multiple>
+  </div>
+
+  <section id="img-section" style="display:none">
+    <div class="toolbar">
+      <div class="tleft">
+        <span class="badge">images: <b id="img-count">0</b> / 40</span>
+        <span class="hint">&mdash; drag to reorder</span>
+      </div>
+      <button class="btn btn-ghost" id="clear-btn">clear all</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-hd">
+      <span id="progress-label">Processing&hellip;</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-accent" id="convert-btn" disabled>generate PDF</button>
+    <a class="btn btn-accent" id="dl-link" style="display:none" download="images.pdf">download PDF</a>
+  </div>
+
+  <footer>
+    100% client-side &nbsp;&middot;&nbsp; no uploads &nbsp;&middot;&nbsp; no server
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/Dhatsme/img-to-pdf" target="_blank" rel="noopener noreferrer">source on github</a>
+  </footer>
+
+</div>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Elements ── */
+  const dropzone      = document.getElementById('dropzone');
+  const fileInput     = document.getElementById('file-input');
+  const imgSection    = document.getElementById('img-section');
+  const grid          = document.getElementById('grid');
+  const imgCount      = document.getElementById('img-count');
+  const clearBtn      = document.getElementById('clear-btn');
+  const convertBtn    = document.getElementById('convert-btn');
+  const dlLink        = document.getElementById('dl-link');
+  const qualSlider    = document.getElementById('quality');
+  const qualVal       = document.getElementById('q-val');
+  const pageSel       = document.getElementById('page-size');
+  const progressWrap  = document.getElementById('progress-wrap');
+  const progressFill  = document.getElementById('progress-fill');
+  const progressLabel = document.getElementById('progress-label');
+  const progressPct   = document.getElementById('progress-pct');
+
+  /* ── State ── */
+  let images  = [];   // [{ file, blobUrl, name }]
+  let dragSrc = null;
+
+  /* ── Quality slider ── */
+  qualSlider.addEventListener('input', () => {
+    qualVal.textContent = qualSlider.value + '%';
+  });
+
+  /* ── Drop zone ── */
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('over');
+  });
+  dropzone.addEventListener('dragleave', e => {
+    if (!dropzone.contains(e.relatedTarget)) dropzone.classList.remove('over');
+  });
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('over');
+    addFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener('change', e => {
+    addFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  /* ── Add files ── */
+  const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+  function addFiles(files) {
+    const slots = 40 - images.length;
+    let added = 0;
+    for (const f of files) {
+      if (added >= slots) break;
+      if (!ALLOWED.has(f.type)) continue;
+      images.push({ file: f, blobUrl: URL.createObjectURL(f), name: f.name });
+      added++;
+    }
+    render();
+  }
+
+  /* ── Render grid ── */
+  function render() {
+    grid.innerHTML = '';
+
+    images.forEach((img, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.draggable = true;
+      card.dataset.i = i;
+      card.innerHTML =
+        '<img src="' + img.blobUrl + '" alt="">' +
+        '<div class="c-overlay">' +
+          '<div class="c-top">' +
+            '<span class="c-num">#' + (i + 1) + '</span>' +
+            '<button class="c-del" data-i="' + i + '" title="Remove">&times;</button>' +
+          '</div>' +
+          '<span class="c-name">' + esc(img.name) + '</span>' +
+        '</div>';
+
+      /* Desktop drag-and-drop */
+      card.addEventListener('dragstart', e => {
+        dragSrc = i;
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => card.classList.add('dragging'));
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        clearOverTargets();
+      });
+      card.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        clearOverTargets();
+        card.classList.add('over-t');
+      });
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        if (dragSrc !== null && dragSrc !== i) reorder(dragSrc, i);
+      });
+
+      /* Touch drag-and-drop */
+      setupTouch(card, i);
+
+      grid.appendChild(card);
+    });
+
+    /* Delete buttons */
+    grid.querySelectorAll('.c-del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = +btn.dataset.i;
+        URL.revokeObjectURL(images[idx].blobUrl);
+        images.splice(idx, 1);
+        render();
+      });
+    });
+
+    imgCount.textContent = images.length;
+    imgSection.style.display = images.length ? 'block' : 'none';
+    convertBtn.disabled = !images.length;
+    dlLink.style.display = 'none';
+  }
+
+  function reorder(from, to) {
+    const [item] = images.splice(from, 1);
+    images.splice(to, 0, item);
+    dragSrc = null;
+    render();
+  }
+
+  function clearOverTargets() {
+    grid.querySelectorAll('.over-t').forEach(el => el.classList.remove('over-t'));
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+  }
+
+  /* ── Touch reorder ── */
+  function setupTouch(card, idx) {
+    let clone = null, startX, startY, cardRect;
+
+    card.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      cardRect = card.getBoundingClientRect();
+      dragSrc = idx;
+
+      clone = card.cloneNode(true);
+      Object.assign(clone.style, {
+        position:      'fixed',
+        left:          cardRect.left + 'px',
+        top:           cardRect.top  + 'px',
+        width:         cardRect.width  + 'px',
+        height:        cardRect.height + 'px',
+        opacity:       '.82',
+        zIndex:        '9999',
+        pointerEvents: 'none',
+        transform:     'scale(1.07)',
+        transition:    'none',
+        borderRadius:  '6px',
+      });
+      document.body.appendChild(clone);
+      card.classList.add('dragging');
+    }, { passive: true });
+
+    card.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      clone.style.left = (cardRect.left + t.clientX - startX) + 'px';
+      clone.style.top  = (cardRect.top  + t.clientY - startY) + 'px';
+
+      clone.style.display = 'none';
+      const under = document.elementFromPoint(t.clientX, t.clientY);
+      clone.style.display = '';
+      clearOverTargets();
+      const target = under && under.closest('.card');
+      if (target && target !== card) target.classList.add('over-t');
+    }, { passive: false });
+
+    card.addEventListener('touchend', e => {
+      if (clone) { clone.remove(); clone = null; }
+      card.classList.remove('dragging');
+      clearOverTargets();
+
+      const t     = e.changedTouches[0];
+      const under = document.elementFromPoint(t.clientX, t.clientY);
+      const target = under && under.closest('.card');
+      const src = dragSrc;
+      dragSrc = null;
+
+      if (target && target !== card) {
+        const to = +target.dataset.i;
+        if (!isNaN(to) && to !== src) { reorder(src, to); return; }
+      }
+      render();
+    }, { passive: true });
+  }
+
+  /* ── Clear all ── */
+  clearBtn.addEventListener('click', () => {
+    images.forEach(img => URL.revokeObjectURL(img.blobUrl));
+    images = [];
+    render();
+  });
+
+  /* ── Progress helper ── */
+  function progress(pct, label) {
+    progressFill.style.width = pct + '%';
+    progressPct.textContent  = Math.round(pct) + '%';
+    if (label) progressLabel.textContent = label;
+  }
+
+  /* ── Compress via Canvas API ── */
+  function compressImage(file, maxW, quality) {
+    return new Promise((resolve, reject) => {
+      const src = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(src);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', quality / 100), w, h });
+      };
+      img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('Failed to load: ' + file.name)); };
+      img.src = src;
+    });
+  }
+
+  /* ── Page dimensions (mm) for A4 / Letter ── */
+  const PAGE = {
+    a4:     { p: [210, 297],     l: [297, 210]     },
+    letter: { p: [215.9, 279.4], l: [279.4, 215.9] },
+  };
+
+  function pageDims(size, w, h) {
+    if (size === 'fit') {
+      /* Convert pixels to mm at 96 dpi (1 in = 25.4 mm, 1 in = 96 px) */
+      return [+(w * 25.4 / 96).toFixed(3), +(h * 25.4 / 96).toFixed(3)];
+    }
+    return PAGE[size][w >= h ? 'l' : 'p'];
+  }
+
+  /* ── Convert ── */
+  convertBtn.addEventListener('click', async () => {
+    if (!images.length) return;
+
+    convertBtn.disabled     = true;
+    dlLink.style.display    = 'none';
+    progressWrap.style.display = 'block';
+    progress(0, 'Starting…');
+
+    const quality  = +qualSlider.value;
+    const size     = pageSel.value;
+    const maxW     = 1600;
+    const total    = images.length;
+    let pdf = null;
+
+    try {
+      for (let i = 0; i < total; i++) {
+        progress(i / total * 88, 'Image ' + (i + 1) + ' / ' + total + '…');
+        await yieldToBrowser();
+
+        const { dataUrl, w, h } = await compressImage(images[i].file, maxW, quality);
+        const [pageW, pageH] = pageDims(size, w, h);
+
+        if (pdf === null) {
+          pdf = new window.jspdf.jsPDF({ unit: 'mm', format: [pageW, pageH] });
+        } else {
+          pdf.addPage([pageW, pageH]);
+        }
+
+        const pw = pdf.internal.pageSize.getWidth();
+        const ph = pdf.internal.pageSize.getHeight();
+
+        if (size === 'fit') {
+          pdf.addImage(dataUrl, 'JPEG', 0, 0, pw, ph);
+        } else {
+          /* Fit image within page with 8 mm margin, centred */
+          const margin = 8;
+          const aw = pw - margin * 2;
+          const ah = ph - margin * 2;
+          const scale = Math.min(aw / w, ah / h);
+          const iw = w * scale;
+          const ih = h * scale;
+          const x  = margin + (aw - iw) / 2;
+          const y  = margin + (ah - ih) / 2;
+          pdf.addImage(dataUrl, 'JPEG', x, y, iw, ih);
+        }
+      }
+
+      progress(95, 'Generating PDF…');
+      await yieldToBrowser();
+
+      const blob   = pdf.output('blob');
+      const url    = URL.createObjectURL(blob);
+      const sizeMB = (blob.size / 1048576).toFixed(2);
+
+      progress(100, 'Done!');
+
+      dlLink.href        = url;
+      dlLink.download    = 'images.pdf';
+      dlLink.textContent = '↓ download PDF (' + sizeMB + ' MB)';
+      dlLink.style.display = 'inline-flex';
+
+    } catch (err) {
+      progress(0, 'Error: ' + err.message);
+      console.error(err);
+    } finally {
+      convertBtn.disabled = false;
+    }
+  });
+
+  function yieldToBrowser() {
+    return new Promise(r => setTimeout(r, 0));
+  }
+
+})();
+</script>
+</body>
+</html>
