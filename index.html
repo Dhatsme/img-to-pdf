@@ -329,7 +329,6 @@
 (function () {
   'use strict';
 
-  /* ── Elements ── */
   const dropzone      = document.getElementById('dropzone');
   const fileInput     = document.getElementById('file-input');
   const imgSection    = document.getElementById('img-section');
@@ -346,37 +345,23 @@
   const progressLabel = document.getElementById('progress-label');
   const progressPct   = document.getElementById('progress-pct');
 
-  /* ── State ── */
-  let images  = [];   // [{ file, blobUrl, name }]
+  let images  = [];
   let dragSrc = null;
 
-  /* ── Quality slider ── */
   qualSlider.addEventListener('input', () => {
     qualVal.textContent = qualSlider.value + '%';
   });
 
-  /* ── Drop zone ── */
   dropzone.addEventListener('click', () => fileInput.click());
-
-  dropzone.addEventListener('dragover', e => {
-    e.preventDefault();
-    dropzone.classList.add('over');
-  });
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
   dropzone.addEventListener('dragleave', e => {
     if (!dropzone.contains(e.relatedTarget)) dropzone.classList.remove('over');
   });
   dropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropzone.classList.remove('over');
-    addFiles(e.dataTransfer.files);
+    e.preventDefault(); dropzone.classList.remove('over'); addFiles(e.dataTransfer.files);
   });
+  fileInput.addEventListener('change', e => { addFiles(e.target.files); fileInput.value = ''; });
 
-  fileInput.addEventListener('change', e => {
-    addFiles(e.target.files);
-    fileInput.value = '';
-  });
-
-  /* ── Add files ── */
   const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   function addFiles(files) {
@@ -391,10 +376,8 @@
     render();
   }
 
-  /* ── Render grid ── */
   function render() {
     grid.innerHTML = '';
-
     images.forEach((img, i) => {
       const card = document.createElement('div');
       card.className = 'card';
@@ -410,34 +393,24 @@
           '<span class="c-name">' + esc(img.name) + '</span>' +
         '</div>';
 
-      /* Desktop drag-and-drop */
       card.addEventListener('dragstart', e => {
-        dragSrc = i;
-        e.dataTransfer.effectAllowed = 'move';
+        dragSrc = i; e.dataTransfer.effectAllowed = 'move';
         requestAnimationFrame(() => card.classList.add('dragging'));
       });
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-        clearOverTargets();
-      });
+      card.addEventListener('dragend', () => { card.classList.remove('dragging'); clearOverTargets(); });
       card.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        clearOverTargets();
-        card.classList.add('over-t');
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        clearOverTargets(); card.classList.add('over-t');
       });
       card.addEventListener('drop', e => {
         e.preventDefault();
         if (dragSrc !== null && dragSrc !== i) reorder(dragSrc, i);
       });
 
-      /* Touch drag-and-drop */
       setupTouch(card, i);
-
       grid.appendChild(card);
     });
 
-    /* Delete buttons */
     grid.querySelectorAll('.c-del').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -466,47 +439,31 @@
   }
 
   function esc(s) {
-    return s.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  /* ── Touch reorder ── */
   function setupTouch(card, idx) {
     let clone = null, startX, startY, cardRect;
-
     card.addEventListener('touchstart', e => {
       const t = e.touches[0];
-      startX = t.clientX;
-      startY = t.clientY;
+      startX = t.clientX; startY = t.clientY;
       cardRect = card.getBoundingClientRect();
       dragSrc = idx;
-
       clone = card.cloneNode(true);
       Object.assign(clone.style, {
-        position:      'fixed',
-        left:          cardRect.left + 'px',
-        top:           cardRect.top  + 'px',
-        width:         cardRect.width  + 'px',
-        height:        cardRect.height + 'px',
-        opacity:       '.82',
-        zIndex:        '9999',
-        pointerEvents: 'none',
-        transform:     'scale(1.07)',
-        transition:    'none',
-        borderRadius:  '6px',
+        position:'fixed', left:cardRect.left+'px', top:cardRect.top+'px',
+        width:cardRect.width+'px', height:cardRect.height+'px',
+        opacity:'.82', zIndex:'9999', pointerEvents:'none',
+        transform:'scale(1.07)', transition:'none', borderRadius:'6px',
       });
       document.body.appendChild(clone);
       card.classList.add('dragging');
     }, { passive: true });
-
     card.addEventListener('touchmove', e => {
       e.preventDefault();
       const t = e.touches[0];
       clone.style.left = (cardRect.left + t.clientX - startX) + 'px';
       clone.style.top  = (cardRect.top  + t.clientY - startY) + 'px';
-
       clone.style.display = 'none';
       const under = document.elementFromPoint(t.clientX, t.clientY);
       clone.style.display = '';
@@ -514,18 +471,15 @@
       const target = under && under.closest('.card');
       if (target && target !== card) target.classList.add('over-t');
     }, { passive: false });
-
     card.addEventListener('touchend', e => {
       if (clone) { clone.remove(); clone = null; }
       card.classList.remove('dragging');
       clearOverTargets();
-
-      const t     = e.changedTouches[0];
+      const t = e.changedTouches[0];
       const under = document.elementFromPoint(t.clientX, t.clientY);
       const target = under && under.closest('.card');
       const src = dragSrc;
       dragSrc = null;
-
       if (target && target !== card) {
         const to = +target.dataset.i;
         if (!isNaN(to) && to !== src) { reorder(src, to); return; }
@@ -534,21 +488,17 @@
     }, { passive: true });
   }
 
-  /* ── Clear all ── */
   clearBtn.addEventListener('click', () => {
     images.forEach(img => URL.revokeObjectURL(img.blobUrl));
-    images = [];
-    render();
+    images = []; render();
   });
 
-  /* ── Progress helper ── */
   function progress(pct, label) {
     progressFill.style.width = pct + '%';
     progressPct.textContent  = Math.round(pct) + '%';
     if (label) progressLabel.textContent = label;
   }
 
-  /* ── Compress via Canvas API ── */
   function compressImage(file, maxW, quality) {
     return new Promise((resolve, reject) => {
       const src = URL.createObjectURL(file);
@@ -567,7 +517,30 @@
     });
   }
 
-  /* ── Page dimensions (mm) for A4 / Letter ── */
+  /* Centre-crop image to match page aspect ratio — zero whitespace */
+  function cropToAspect(dataUrl, imgW, imgH, pageW, pageH) {
+    return new Promise(resolve => {
+      const pageAspect = pageW / pageH;
+      const imgAspect  = imgW  / imgH;
+      let sx = 0, sy = 0, sw = imgW, sh = imgH;
+      if (imgAspect > pageAspect) {
+        sw = Math.round(imgH * pageAspect);
+        sx = Math.round((imgW - sw) / 2);
+      } else if (imgAspect < pageAspect) {
+        sh = Math.round(imgW / pageAspect);
+        sy = Math.round((imgH - sh) / 2);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      const img = new Image();
+      img.onload = () => {
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      };
+      img.src = dataUrl;
+    });
+  }
+
   const PAGE = {
     a4:     { p: [210, 297],     l: [297, 210]     },
     letter: { p: [215.9, 279.4], l: [279.4, 215.9] },
@@ -575,25 +548,22 @@
 
   function pageDims(size, w, h) {
     if (size === 'fit') {
-      /* Convert pixels to mm at 96 dpi (1 in = 25.4 mm, 1 in = 96 px) */
       return [+(w * 25.4 / 96).toFixed(3), +(h * 25.4 / 96).toFixed(3)];
     }
     return PAGE[size][w >= h ? 'l' : 'p'];
   }
 
-  /* ── Convert ── */
   convertBtn.addEventListener('click', async () => {
     if (!images.length) return;
-
-    convertBtn.disabled     = true;
-    dlLink.style.display    = 'none';
+    convertBtn.disabled = true;
+    dlLink.style.display = 'none';
     progressWrap.style.display = 'block';
     progress(0, 'Starting…');
 
-    const quality  = +qualSlider.value;
-    const size     = pageSel.value;
-    const maxW     = 1600;
-    const total    = images.length;
+    const quality = +qualSlider.value;
+    const size    = pageSel.value;
+    const maxW    = 1600;
+    const total   = images.length;
     let pdf = null;
 
     try {
@@ -616,16 +586,9 @@
         if (size === 'fit') {
           pdf.addImage(dataUrl, 'JPEG', 0, 0, pw, ph);
         } else {
-          /* Fit image within page with 8 mm margin, centred */
-          const margin = 8;
-          const aw = pw - margin * 2;
-          const ah = ph - margin * 2;
-          const scale = Math.min(aw / w, ah / h);
-          const iw = w * scale;
-          const ih = h * scale;
-          const x  = margin + (aw - iw) / 2;
-          const y  = margin + (ah - ih) / 2;
-          pdf.addImage(dataUrl, 'JPEG', x, y, iw, ih);
+          /* Crop image to page aspect ratio (cover), fill page with zero whitespace */
+          const cropped = await cropToAspect(dataUrl, w, h, pw, ph);
+          pdf.addImage(cropped, 'JPEG', 0, 0, pw, ph);
         }
       }
 
@@ -637,7 +600,6 @@
       const sizeMB = (blob.size / 1048576).toFixed(2);
 
       progress(100, 'Done!');
-
       dlLink.href        = url;
       dlLink.download    = 'images.pdf';
       dlLink.textContent = '↓ download PDF (' + sizeMB + ' MB)';
