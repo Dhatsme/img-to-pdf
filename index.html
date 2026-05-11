@@ -616,16 +616,9 @@
         if (size === 'fit') {
           pdf.addImage(dataUrl, 'JPEG', 0, 0, pw, ph);
         } else {
-          /* Fit image within page with 8 mm margin, centred */
-          const margin = 8;
-          const aw = pw - margin * 2;
-          const ah = ph - margin * 2;
-          const scale = Math.min(aw / w, ah / h);
-          const iw = w * scale;
-          const ih = h * scale;
-          const x  = margin + (aw - iw) / 2;
-          const y  = margin + (ah - ih) / 2;
-          pdf.addImage(dataUrl, 'JPEG', x, y, iw, ih);
+          /* Crop image to page aspect ratio (cover), fill page with zero whitespace */
+          const cropped = await cropToAspect(dataUrl, w, h, pw, ph);
+          pdf.addImage(cropped, 'JPEG', 0, 0, pw, ph);
         }
       }
 
@@ -650,6 +643,30 @@
       convertBtn.disabled = false;
     }
   });
+
+  /* Centre-crop image to match page aspect ratio, then fill page (no whitespace) */
+  function cropToAspect(dataUrl, imgW, imgH, pageW, pageH) {
+    return new Promise(resolve => {
+      const pageAspect = pageW / pageH;
+      const imgAspect  = imgW  / imgH;
+      let sx = 0, sy = 0, sw = imgW, sh = imgH;
+      if (imgAspect > pageAspect) {
+        sw = Math.round(imgH * pageAspect);
+        sx = Math.round((imgW - sw) / 2);
+      } else if (imgAspect < pageAspect) {
+        sh = Math.round(imgW / pageAspect);
+        sy = Math.round((imgH - sh) / 2);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      const img = new Image();
+      img.onload = () => {
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      };
+      img.src = dataUrl;
+    });
+  }
 
   function yieldToBrowser() {
     return new Promise(r => setTimeout(r, 0));
